@@ -16,10 +16,6 @@ function __main__() {
   local counter=0;
   
   # BODY
-  rm -f diagnostic_report_all*
-  rm -f diagnostic_report_eogs*
-  rm -f diagnostic_report_supported*
-  
   while getopts ":hk:f:" option
   do
     case ${option} in
@@ -27,6 +23,7 @@ function __main__() {
         if verify_json_file "${OPTARG}"
         then
           file_name="${OPTARG}"
+          path_file_name="$(getDir $file_name)"
         else
           echo "Error with the return value while verifying json file."
         fi
@@ -50,6 +47,11 @@ function __main__() {
       ;;
       esac
   done
+
+  rm -f "$path_file_name/diagnostic_report_all*"
+  rm -f "$path_file_name/diagnostic_report_eogs*"
+  rm -f "$path_file_name/diagnostic_report_supported*"
+  rm -f "$path_file_name/diagnostic_report_error*"
   
   for product_name in $(jq '.added_products.deployed[] | .name' $file_name | sed 's/"//g')
   do
@@ -57,28 +59,39 @@ function __main__() {
     product_pivnet_slug="$product_name"
     counter=0
     
+    echo "Checking ${product_name}..."
+    
     while [ $counter -le 1 ]
     do
       obj_jq=$(curl -X GET "$product_pivnet_url/$product_pivnet_slug" --silent)
       
       if [[ $(echo "$obj_jq" | jq ".status") != 404 ]]
       then
-        fx_tmp_name $product_name $product_version "$obj_jq"
+        parseObjJQ $product_name $product_version "$obj_jq"
         break;
       else
         if [[ $counter -eq 0 ]]
         then
           product_pivnet_slug=$(checkPivnetName $product_name)
         else
-          echo "Unable to solve the Product Pivnet Slung Name for Product: $product_name"
+          generateJSON 'diagnostic_report_error.json' "N/A" $product_pivnet_slug $product_name $product_version "N/A" "Unable to get pivnet slug name."
         fi
         counter=$((counter+1))
       fi
     done
   done
+  
+  echo ""
+  echo ""
+  echo ""
+  echo "JSON diagnostic_report files are located in path: $path_file_name"
+  for x in $(ls $path_file_name | grep 'diagnostic_report' | grep -v 'diagnostic_report.json')
+  do
+    echo "            * $x"
+  done
 }
 
-function fx_tmp_name () {
+function parseObjJQ () {
   # variables
   local product_name=$1
   local product_version=$2
@@ -95,40 +108,44 @@ function fx_tmp_name () {
   then
     if [[ $product_eogs_date < $today_is ]]
     then
-      generateJSON 'diagnostic_report_all.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date
-      generateJSON 'diagnostic_report_eogs.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date
+      generateJSON 'diagnostic_report_eogs.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date ""
     elif [[ $product_eogs_date == $today_is ]]
     then
-      generateJSON 'diagnostic_report_all.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date
-      generateJSON 'diagnostic_report_eogs.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date
-      generateJSON 'diagnostic_report_supported.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date
+      generateJSON 'diagnostic_report_eogs.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date ""
+      generateJSON 'diagnostic_report_supported.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date ""
     else
-      generateJSON 'diagnostic_report_all.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date
-      generateJSON 'diagnostic_report_supported.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date
+      generateJSON 'diagnostic_report_supported.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date ""
     fi
   else
-    echo "Error with product eogs date which is $product_eogs_date, with a product name of $product_name using version $product_version"
-    echo "    $product_pivnet_url/$product_name"
+    generateJSON 'diagnostic_report_error.json' $product_id $product_pivnet_slug $product_name $product_version $product_eogs_date "Error with EOGS date."
   fi
 }
 
 function generateJSON () {
   # variables
-  local file=$1
+  local file="$path_file_name/$1"
   local product_id=$2
   local product_pivnet_slug=$3
   local product_name=$4
   local product_version=$5
   local product_eogs_date=$6
+  local message=$7
   local tanzu_network_url="https://network.pivotal.io/products/$product_name/releases/$product_id"
+  local diagnostic_all="$path_file_name/diagnostic_report_all.json"
   
   # body
   if [ ! -f $file ]
   then
     echo '{}' > $file
   fi
-  
-  echo "$(jq ".deployed += [{ \"id\": \"$product_id\", \"pivnet_slug\": \"$product_pivnet_slug\", \"name\": \"$product_name\", \"version\": \"$product_version\", \"eogs_date\": \"$product_eogs_date\", \"url\": \"$tanzu_network_url\" }]" $file)" > $file
+
+  if [ ! -f $diagnostic_all ]
+  then
+    echo '{}' > $diagnostic_all
+  fi
+    
+  echo "$(jq ".deployed += [{ \"id\": \"$product_id\", \"pivnet_slug\": \"$product_pivnet_slug\", \"name\": \"$product_name\", \"version\": \"$product_version\", \"eogs_date\": \"$product_eogs_date\", \"url\": \"$tanzu_network_url\", \"message\": \"$message\" }]" $diagnostic_all)" > $diagnostic_all
+  echo "$(jq ".deployed += [{ \"id\": \"$product_id\", \"pivnet_slug\": \"$product_pivnet_slug\", \"name\": \"$product_name\", \"version\": \"$product_version\", \"eogs_date\": \"$product_eogs_date\", \"url\": \"$tanzu_network_url\", \"message\": \"$message\" }]" $file)" > $file
 }
 
 function checkDate () {
@@ -154,6 +171,9 @@ function checkPivnetName () {
     ["appMetrics"]="apm"
     ["p-antivirus"]="p-clamav-addon"
     ["p-antivirus-mirror"]="p-clamav-addon"
+    ["p-fim"]="p-fim-addon"
+    ["appdynamics"]="p-appdynamics"
+    ["p-isolation-segment-tve"]="p-isolation-segment"
   )
   
   for index in ${!pivnet_slug_arr[@]}
@@ -193,9 +213,25 @@ function verify_json_file () {
   fi
 }
 
+function getDir () {
+  local path_file_name=$1
+  local dir_path=$(echo "$path_file_name" | rev | awk -F "/" '{ s = ""; for (i = 2; i <= NF; i++) s = s $i " "; print s }' | rev | sed 's/ /\//g')
+  
+  dir_path=".${dir_path}"
+  
+  if [ -d $dir_path ]
+  then
+    echo "$dir_path"
+  else
+    echo "Directory: $dir_path is NOT valid."
+    exit
+  fi
+}
+
 
 
 #***********************************
 # MAIN
 #***********************************
+clear;
 __main__ $@
