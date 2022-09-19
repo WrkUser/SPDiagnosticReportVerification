@@ -1,0 +1,66 @@
+README!
+
+Contents Of This File:
+------------------------------------------------------------------------
+* Introduction
+* Requirements
+* Recommended modules
+* Installation
+* Configuration
+* Troubleshooting
+* FAQ
+* Maintainers
+* Example(s)
+
+
+
+Introduction
+------------------------------------------------------------------------
+This is very basic tool to get feedback from the OpsMan Support Bundle 
+for the "diagnostic_report.json" file. Some of the contents it'll 
+retrieve are:
+  * EOGS of a product
+  * Supported product
+
+Requirements
+------------------------------------------------------------------------
+This has only been tested in Macbook Pro, with bash version 5.1.16. To 
+install a newer version of bash run "brew install bash". A reboot may
+be required.
+
+Recommended modules
+------------------------------------------------------------------------
+N.A.
+
+Installation
+------------------------------------------------------------------------
+Remember to read the "Requirements" section.
+Copy and paste? lol
+  1) create a file: touch bacon.sh
+  2) make file executable: chmod +x bacon.sh
+  3) copy script from github and paste it to 'bacon.sh'
+  4) move the script to bin directory: mv bacon.sh /usr/local/bin/bacon
+  5) bacon -f support_bundle/diagnostic_report.json
+
+Configuration
+------------------------------------------------------------------------
+N.A.
+
+Troubleshooting
+------------------------------------------------------------------------
+If the script hangs, with no output/display... there might be a flag 
+missing. Typically it's the "-f" flag, to specify the path to the 
+"diagnostic_report.json".
+
+FAQ
+------------------------------------------------------------------------
+N.A.
+
+Maintainers
+------------------------------------------------------------------------
+Earth. I think.
+
+Examples
+------------------------------------------------------------------------
+bacon -f support_bundle/diagnostic_report.json
+less support_bundle/diagnostic_report.json
