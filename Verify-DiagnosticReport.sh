@@ -16,6 +16,12 @@ function __main__() {
   local counter=0;
   
   # BODY
+  if [[ ! $@ =! ^\-.+ ]]
+  then
+    echo "Please run with the -h for assitance.";
+    exit;
+  fi
+  
   while getopts ":hk:f:" option
   do
     case ${option} in
