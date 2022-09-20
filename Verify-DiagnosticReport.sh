@@ -16,7 +16,7 @@ function __main__() {
   local counter=0;
   
   # BODY
-  if [[ ! $@ =! ^\-.+ ]]
+  if [[ ! $@ =~ ^\-.+ ]]
   then
     echo "Please run with the -h for assitance.";
     exit;
